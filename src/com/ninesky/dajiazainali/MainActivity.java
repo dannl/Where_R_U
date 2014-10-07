@@ -8,14 +8,18 @@ import com.loopj.android.http.JsonHttpResponseHandler;
 import org.apache.http.Header;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import android.annotation.TargetApi;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.text.TextUtils;
 import android.widget.EditText;
@@ -24,23 +28,37 @@ import java.io.File;
 
 public class MainActivity extends ActionBarActivity {
     private TextView mLocationTxtView = null;
+    private TextView mHintTxtView = null;
     private MyReceiver mLocationReciever = null;
 
     public LocationClient mLocationClient = null;
 
+    @TargetApi(Build.VERSION_CODES.GINGERBREAD)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mLocationTxtView = (EditText) findViewById(R.id.editText);
-//        startService(new Intent(MainActivity.this, CountService.class));
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        final boolean isFirstTimeToStart = preferences.getBoolean("PREF_IS_FIRST_TIME", true);
+        if (isFirstTimeToStart) {
+            preferences.edit().putBoolean("PREF_IS_FIRST_TIME", false).apply();
+            final Intent intent = new Intent(this, WelcomeActivity.class);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
+        mLocationTxtView = (TextView) findViewById(R.id.location);
+        mHintTxtView = (TextView) findViewById(R.id.hint);
+        startService(new Intent(MainActivity.this, CountService.class));
 
         mLocationReciever = new MyReceiver();
         IntentFilter filter = new IntentFilter();
         filter.addAction("com.ljq.activity.CountService");
         MainActivity.this.registerReceiver(mLocationReciever, filter);
         checkUpdate();
+        setupContent();
     }
 
     private void checkUpdate() {
@@ -78,10 +96,6 @@ public class MainActivity extends ActionBarActivity {
         });
     }
 
-    private void showStartUpHint() {
-
-    }
-
     private void downloadAndInstall(final String url) {
         final File tempApkFile = new File(getExternalCacheDir(), String.valueOf(url).hashCode() + ".apk");
         if (tempApkFile.exists()) {
@@ -111,6 +125,12 @@ public class MainActivity extends ActionBarActivity {
         startActivity(intent);
     }
 
+    private void setupContent() {
+        setLocation("");
+        final String IMEI = DeviceHelper.getIME(this);
+        mHintTxtView.setText(getString(R.string.hint_template, IMEI));
+    }
+
     @Override
     protected void onDestroy() {
         stopService(new Intent(MainActivity.this, CountService.class));
@@ -122,9 +142,13 @@ public class MainActivity extends ActionBarActivity {
         public void onReceive(Context context, Intent intent) {
             Bundle bundle = intent.getExtras();
             String locStr = bundle.getString("locStr");
-            mLocationTxtView.setText(locStr);
-
+            setLocation(locStr);
         }
+    }
+
+    private void setLocation(final String text) {
+        final String location = getString(R.string.template, text);
+        mLocationTxtView.setText(location);
     }
     /*
      * public class BootCompletedReceiver extends BroadcastReceiver{

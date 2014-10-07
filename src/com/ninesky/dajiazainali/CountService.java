@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -17,6 +18,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
@@ -30,12 +32,12 @@ import com.baidu.location.LocationClientOption.LocationMode;
 
 public class CountService extends Service {
 
-    private boolean threadDisable = false;
-    MainActivity varMainActivity = new MainActivity();
     public LocationClient mLocationClient = null;
-    private EditText editText = null;
 
-    private String locStr = "";
+    private String mLastLocation = "";
+    private String mLocation = "";
+    private String mAddress = "";
+    private ReportLocationThread mThread;
 
     @Override
     public void onCreate() {
@@ -45,47 +47,6 @@ public class CountService extends Service {
         mLocationClient.registerLocationListener(new MyLocationListener());
         InitLocation();
         mLocationClient.start();
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (!threadDisable) {
-                    try {
-                        Thread.sleep(5000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-
-                    List<BasicNameValuePair> params = new ArrayList<BasicNameValuePair>();
-                    String theImei = DeviceHelper.getIME(CountService.this);
-                    params.add(new BasicNameValuePair("imei", theImei));
-                    params.add(new BasicNameValuePair("loc", locStr));
-                    params.add(new BasicNameValuePair("jsoncallback",
-                            "jQuery110108208465098869056_1411286271256"));
-
-                    String param = URLEncodedUtils.format(params, "UTF-8");
-
-                    String baseUrl = "http://112.124.6.192:8000/message/new";
-
-                    HttpGet getMethod = new HttpGet(baseUrl + "?" + param);
-                    HttpClient httpClient = new DefaultHttpClient();
-
-                    try {
-                        HttpResponse response = httpClient.execute(getMethod);
-                    } catch (ClientProtocolException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    Intent intent = new Intent();
-                    intent.putExtra("locStr", locStr);
-                    intent.setAction("com.ljq.activity.CountService");
-                    sendBroadcast(intent);
-                }
-            }
-        }).start();
-
     }
 
     @Override
@@ -96,7 +57,6 @@ public class CountService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        threadDisable = true;
         Log.v("CountService", "on destroy");
     }
 
@@ -106,7 +66,7 @@ public class CountService extends Service {
         option.setCoorType("bd09ll");
         int span = 5000;
         option.setScanSpan(span);
-        option.setIsNeedAddress(false);
+        option.setIsNeedAddress(true);
         mLocationClient.setLocOption(option);
     }
 
@@ -114,8 +74,55 @@ public class CountService extends Service {
 
         @Override
         public void onReceiveLocation(BDLocation location) {
-            locStr = location.getLongitude() + "," + location.getLatitude();
-            Log.i("dwtedx", locStr);
+            mLocation = location.getLongitude() + "," + location.getLatitude();
+            mAddress = location.getAddrStr();
+            Log.i("dwtedx", mAddress);
+            if (mThread == null) {
+                mThread = new ReportLocationThread();
+                mThread.start();
+            }
+        }
+    }
+
+    private class ReportLocationThread extends Thread {
+
+        @Override
+        public void run() {
+
+            if (TextUtils.equals(mLastLocation, mLocation)) {
+                //do not report duplicated location.
+                return;
+            }
+            mLastLocation = mLocation;
+
+            Intent intent = new Intent();
+            intent.putExtra("locStr", mAddress);
+            intent.setAction("com.ljq.activity.CountService");
+            sendBroadcast(intent);
+
+            List<BasicNameValuePair> params = new ArrayList<BasicNameValuePair>();
+            String theImei = DeviceHelper.getIME(CountService.this);
+            params.add(new BasicNameValuePair("imei", theImei));
+            params.add(new BasicNameValuePair("loc", mLocation));
+            params.add(new BasicNameValuePair("jsoncallback",
+                    "jQuery110108208465098869056_1411286271256"));
+
+            String param = URLEncodedUtils.format(params, "UTF-8");
+
+            String baseUrl = "http://112.124.6.192:8000/message/new";
+
+            HttpGet getMethod = new HttpGet(baseUrl + "?" + param);
+            HttpClient httpClient = new DefaultHttpClient();
+
+            try {
+                HttpResponse response = httpClient.execute(getMethod);
+            } catch (ClientProtocolException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            mThread = null;
         }
 
     }

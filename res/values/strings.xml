@@ -4,5 +4,8 @@
     <string name="app_name">大家在哪里</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
-
+    <string name="welcome_title">用户须知</string>
+    <string name="welcome_content">本应用为“大家在哪”网【<a href="www.DaJiaZaiNa.com">www.DaJiaZaiNa.com</a>】的移动端配套产品。您可能是应你的家人或者朋友邀请下载安装本应用。本应用体积小，耗电和流量极小，仅仅获取您手机所在的地理位置信息，并发送给您的家人或朋友，以便让他们实时知道您身处何地。如果您不想使用本产品，请及时的告知您的家人或朋友，以便他们获悉。</string>
+    <string name="template">您所在的位置：%s</string>
+    <string name="hint_template">温馨提示：您的手机IMEI码为：%s，您可以将其告知邀请你下载安装本应用的家人亲戚朋友，以便让他们实时了解到您身处何地。</string>
 </resources>
